@@ -22,7 +22,22 @@ function compress(messages: ChatMessage[]): ChatMessage[] {
 }
 
 async function loadOwnedDataset(id: string, userId: string) {
-  const dataset = await prisma.dataset.findUnique({ where: { id } });
+  const dataset = await prisma.dataset.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      userId: true,
+      summary: true,
+      qualityScore: true,
+      rowCount: true,
+      colCount: true,
+      issues: true,
+      stats: true,
+      chatHistory: true,
+      // originalFile/cleanedFile excluded — not needed for chat, avoids pulling
+      // potentially 100MB of file bytes into memory on every message.
+    },
+  });
   if (!dataset) return { error: NextResponse.json({ error: 'Датасет не найден' }, { status: 404 }) };
   if (dataset.userId !== userId) {
     return { error: NextResponse.json({ error: 'Доступ запрещён' }, { status: 403 }) };

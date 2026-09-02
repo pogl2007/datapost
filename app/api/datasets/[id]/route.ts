@@ -8,7 +8,30 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     return NextResponse.json({ error: 'Не авторизован' }, { status: 401 });
   }
 
-  const dataset = await prisma.dataset.findUnique({ where: { id: params.id } });
+  const dataset = await prisma.dataset.findUnique({
+    where: { id: params.id },
+    select: {
+      id: true,
+      userId: true,
+      fileName: true,
+      fileSize: true,
+      rowCount: true,
+      colCount: true,
+      format: true,
+      status: true,
+      qualityScore: true,
+      issueCount: true,
+      criticalCount: true,
+      summary: true,
+      issues: true,
+      stats: true,
+      createdAt: true,
+      completedAt: true,
+      // originalFile/cleanedFile deliberately excluded — the report page never
+      // needs raw file bytes, and Buffers serialize to JSON at ~3-4x their size.
+      // Download goes through the dedicated /clean endpoint instead.
+    },
+  });
 
   if (!dataset) {
     return NextResponse.json({ error: 'Датасет не найден' }, { status: 404 });
