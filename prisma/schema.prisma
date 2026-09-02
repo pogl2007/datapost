@@ -1,0 +1,54 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String
+  name          String?
+  plan          String    @default("FREE")
+  planExpiresAt DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  datasets      Dataset[]
+}
+
+model Dataset {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id])
+  fileName      String
+  fileSize      Int
+  rowCount      Int
+  colCount      Int
+  format        String
+  status        String    @default("PROCESSING")
+  qualityScore  Int?
+  issueCount    Int?
+  criticalCount Int?
+  summary       String?
+  issues        String?
+  stats         String?
+  chatHistory   String?
+  originalFile  Bytes?
+  cleanedFile   Bytes?
+  createdAt     DateTime  @default(now())
+  completedAt   DateTime?
+
+  @@index([userId])
+}
+
+model DailyUsage {
+  id      String @id @default(cuid())
+  userId  String
+  date    String
+  uploads Int    @default(0)
+
+  @@unique([userId, date])
+}
