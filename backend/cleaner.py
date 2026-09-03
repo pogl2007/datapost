@@ -155,13 +155,14 @@ async def clean(request: CleanRequest):
     try:
         raw_bytes = base64.b64decode(request.file_content_base64)
     except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=400, detail=f"Некорректный base64: {exc}") from exc
+        logger.exception("Invalid base64 payload for cleaning: %s", request.file_name)
+        raise HTTPException(status_code=400, detail="Некорректные данные файла.") from exc
 
     try:
         df = load_dataframe(raw_bytes, request.file_name)
     except Exception as exc:  # noqa: BLE001
         logger.exception("Failed to load dataframe for cleaning: %s", request.file_name)
-        raise HTTPException(status_code=400, detail=f"Не удалось прочитать файл: {exc}") from exc
+        raise HTTPException(status_code=400, detail="Не удалось прочитать файл.") from exc
 
     changes: List[str] = []
 
@@ -172,7 +173,7 @@ async def clean(request: CleanRequest):
         df = winsorize(df, changes)
     except Exception as exc:  # noqa: BLE001
         logger.exception("Failed while cleaning dataset: %s", request.file_name)
-        raise HTTPException(status_code=400, detail=f"Ошибка при очистке датасета: {exc}") from exc
+        raise HTTPException(status_code=400, detail="Ошибка при очистке датасета.") from exc
 
     if not changes:
         changes.append("Датасет уже соответствовал критериям качества, изменений не потребовалось")
@@ -181,6 +182,6 @@ async def clean(request: CleanRequest):
         cleaned_b64 = dataframe_to_base64(df, request.file_name)
     except Exception as exc:  # noqa: BLE001
         logger.exception("Failed to re-encode cleaned dataset: %s", request.file_name)
-        raise HTTPException(status_code=400, detail=f"Не удалось сохранить очищенный файл: {exc}") from exc
+        raise HTTPException(status_code=400, detail="Не удалось сохранить очищенный файл.") from exc
 
     return {"cleaned_file_base64": cleaned_b64, "changes_made": changes}

@@ -477,7 +477,10 @@ async def analyze(
         df = read_dataframe(raw_bytes, file.filename or "")
     except Exception as exc:  # noqa: BLE001
         logger.exception("Failed to read uploaded file %s", file.filename)
-        raise HTTPException(status_code=400, detail=f"Не удалось прочитать файл: {exc}") from exc
+        raise HTTPException(
+            status_code=400,
+            detail="Не удалось прочитать файл. Проверьте, что это корректный CSV, Excel или JSON.",
+        ) from exc
 
     target_col: Optional[str] = target_column.strip() if target_column else None
     if target_col and target_col not in df.columns:
@@ -487,7 +490,9 @@ async def analyze(
         stats = compute_stats(df, target_col)
     except Exception as exc:  # noqa: BLE001
         logger.exception("Failed to compute stats for %s", file.filename)
-        raise HTTPException(status_code=400, detail=f"Не удалось проанализировать датасет: {exc}") from exc
+        raise HTTPException(
+            status_code=400, detail="Не удалось проанализировать датасет."
+        ) from exc
 
     sample_data = build_sample_data(df)
 
