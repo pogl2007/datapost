@@ -52,7 +52,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       data: { cleanedFile: buffer },
     });
 
-    const cleanedName = dataset.fileName.replace(/(\.[^.]+)$/, '_cleaned$1');
+    // Strip characters that could break out of the quoted filename parameter
+    // (or inject header syntax) in Content-Disposition.
+    const safeFileName = dataset.fileName.replace(/[^\w.\- ]/g, '_');
+    const cleanedName = safeFileName.replace(/(\.[^.]+)$/, '_cleaned$1');
 
     return new NextResponse(new Uint8Array(buffer), {
       status: 200,
