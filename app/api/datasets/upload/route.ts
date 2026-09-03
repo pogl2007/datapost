@@ -45,12 +45,21 @@ export async function POST(req: NextRequest) {
   }
 
   const dailyLimit = getDailyUploadLimit(plan);
+  const usageDate = todayKey();
   if (dailyLimit !== null) {
-    const date = todayKey();
-    const usage = await prisma.dailyUsage.findUnique({
-      where: { userId_date: { userId, date } },
+    // Reserve a slot atomically (increment-or-create) before doing any work,
+    // then check the post-increment count. This closes the race where two
+    // concurrent uploads both read "under limit" and both proceed.
+    const usage = await prisma.dailyUsage.upsert({
+      where: { userId_date: { userId, date: usageDate } },
+      create: { userId, date: usageDate, uploads: 1 },
+      update: { uploads: { increment: 1 } },
     });
-    if (usage && usage.uploads >= dailyLimit) {
+    if (usage.uploads > dailyLimit) {
+      await prisma.dailyUsage.update({
+        where: { userId_date: { userId, date: usageDate } },
+        data: { uploads: { decrement: 1 } },
+      });
       return NextResponse.json(
         { error: `Достигнут дневной лимит загрузок (${dailyLimit}/день) на плане FREE` },
         { status: 429 }
@@ -103,15 +112,6 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    if (dailyLimit !== null) {
-      const date = todayKey();
-      await prisma.dailyUsage.upsert({
-        where: { userId_date: { userId, date } },
-        create: { userId, date, uploads: 1 },
-        update: { uploads: { increment: 1 } },
-      });
-    }
-
     return NextResponse.json({ datasetId: dataset.id });
   } catch (err) {
     console.error('Analyze error:', err);
@@ -119,6 +119,14 @@ export async function POST(req: NextRequest) {
       where: { id: dataset.id },
       data: { status: 'FAILED' },
     });
+    if (dailyLimit !== null) {
+      // Release the reserved slot — a failed analysis shouldn't count against
+      // the daily limit.
+      await prisma.dailyUsage.update({
+        where: { userId_date: { userId, date: usageDate } },
+        data: { uploads: { decrement: 1 } },
+      });
+    }
     return NextResponse.json(
       { error: 'Не удалось проанализировать датасет. Попробуйте снова.' },
       { status: 502 }
