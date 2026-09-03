@@ -10,7 +10,11 @@ export async function PATCH(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { name, password } = body as { name?: string; password?: string };
+  const { name, password, currentPassword } = body as {
+    name?: string;
+    password?: string;
+    currentPassword?: string;
+  };
 
   const data: { name?: string; passwordHash?: string } = {};
 
@@ -22,6 +26,20 @@ export async function PATCH(req: NextRequest) {
     if (password.length < 8) {
       return NextResponse.json({ error: 'Пароль должен быть не короче 8 символов' }, { status: 400 });
     }
+
+    // Require the current password to change it — otherwise a hijacked
+    // session cookie is enough to lock the real owner out permanently.
+    const user = await prisma.user.findUnique({ where: { id: session.user.id } });
+    if (!user) {
+      return NextResponse.json({ error: 'Пользователь не найден' }, { status: 404 });
+    }
+    const valid =
+      typeof currentPassword === 'string' &&
+      (await bcrypt.compare(currentPassword, user.passwordHash));
+    if (!valid) {
+      return NextResponse.json({ error: 'Неверный текущий пароль' }, { status: 403 });
+    }
+
     data.passwordHash = await bcrypt.hash(password, 12);
   }
 
