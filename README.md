@@ -134,40 +134,21 @@ prisma/                 — schema.prisma, seed.ts
 Ограничения проверяются на сервере в `app/api/datasets/upload/route.ts` и
 `app/api/datasets/[id]/clean/route.ts` (см. `lib/planGuard.ts`).
 
-## 6. Деплой
+## 6. Деплой (свой VDS)
 
-### Frontend → Vercel
+Frontend и backend разворачиваются на одном сервере через **pm2**, база — локальный
+**PostgreSQL**, входящий трафик — через **nginx** (с сертификатом Let's Encrypt / certbot).
 
-1. Импортируй репозиторий в Vercel.
-2. Root Directory — корень этого проекта (не трогай `backend/`, он деплоится отдельно).
-3. Пропиши переменные окружения в настройках проекта Vercel:
-   - `DATABASE_URL` — строка подключения к PostgreSQL на Railway (см. ниже).
-   - `NEXTAUTH_SECRET` — сгенерированный секрет.
-   - `NEXTAUTH_URL` — публичный URL фронтенда (например, `https://datapost.vercel.app`).
-   - `FASTAPI_URL` — публичный URL backend-сервиса на Railway.
-4. Build command: `npm run build` (Vercel определит автоматически для Next.js).
-5. После первого деплоя выполни миграции Prisma против продовой базы:
-   ```bash
-   DATABASE_URL=<railway-url> npx prisma migrate deploy
-   DATABASE_URL=<railway-url> npm run prisma:seed   # опционально, для тестовых данных
-   ```
-
-### Backend → Railway
-
-1. Создай новый сервис в Railway из папки `backend/` (например, отдельный репозиторий или monorepo с
-   указанием root directory `backend`).
-2. Railway должен установить зависимости из `backend/requirements.txt` и запустить сервис командой вида
-   `uvicorn main:app --host 0.0.0.0 --port $PORT`.
-3. Пропиши необходимые backend-специфичные переменные окружения (ключи AI-провайдера и т.д.) в
-   настройках сервиса Railway.
-4. Скопируй публичный URL сервиса Railway — это значение для `FASTAPI_URL` на фронтенде.
-
-### PostgreSQL → Railway
-
-1. Добавь плагин PostgreSQL в проект Railway (или создай отдельный Railway Postgres сервис).
-2. Скопируй `DATABASE_URL` из вкладки Connect — используй его и во фронтенд-сервисе (Vercel), и при
-   локальных миграциях.
-3. Прогони миграции: `npx prisma migrate deploy` с этим `DATABASE_URL`.
+1. Склонируй репозиторий на сервер, создай БД и пользователя в PostgreSQL.
+2. Пропиши `.env` в корне проекта (`DATABASE_URL`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, `FASTAPI_URL=http://127.0.0.1:8000`)
+   и `backend/.env` (`OPENAI_API_KEY`).
+3. Frontend: `npm install`, `npx prisma db push`, `npm run build`, затем
+   `pm2 start npm --name datapost-frontend -- run start -- -p <порт>`.
+4. Backend: `python3 -m venv .venv`, `pip install -r requirements.txt`, затем
+   `pm2 start .venv/bin/uvicorn --name datapost-backend --interpreter none -- main:app --host 127.0.0.1 --port 8000`.
+5. `pm2 save` — чтобы сервисы поднимались сами после перезагрузки сервера.
+6. nginx: server block с `proxy_pass` на порт фронтенда, домен привязан A-записью на IP сервера.
+7. HTTPS: `certbot --nginx -d your-domain.ru -d www.your-domain.ru`.
 
 ## 7. Тестовые данные
 
