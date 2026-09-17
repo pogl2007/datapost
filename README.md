@@ -102,6 +102,28 @@ FastAPI должен слушать порт, указанный в переме
 `app/api/datasets/[id]/clean`), которые сами вызывают `FASTAPI_URL`. Клиент никогда не обращается к
 FastAPI напрямую.
 
+## 3a. Запуск через Docker
+
+Поднимает всё сразу: PostgreSQL, backend, frontend (миграция схемы — отдельным разовым сервисом).
+
+1. Создай в корне проекта `.env` со значениями:
+   ```
+   DB_PASSWORD=любой-пароль
+   NEXTAUTH_SECRET=сгенерируй: openssl rand -base64 32
+   NEXTAUTH_URL=http://localhost:3000
+   OPENAI_API_KEY=твой ключ (можно оставить пустым — тогда анализ работает на локальных правилах)
+   ```
+2. Запусти:
+   ```bash
+   docker compose up --build
+   ```
+3. Сайт будет на `http://localhost:3000`, backend — на `http://localhost:8000`.
+
+Сиды (тестовый пользователь) через Docker не создаются автоматически — при желании выполни разово:
+```bash
+docker compose run --rm migrate npm run prisma:seed
+```
+
 ## 4. Структура проекта
 
 ```

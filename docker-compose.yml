@@ -1,0 +1,49 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: datapost
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-datapost}
+      POSTGRES_DB: datapost
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    ports:
+      - "8000:8000"
+
+  migrate:
+    build:
+      context: .
+      target: builder
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: postgresql://datapost:${DB_PASSWORD:-datapost}@db:5432/datapost
+    command: npx prisma db push
+
+  frontend:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_started
+      backend:
+        condition: service_started
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgresql://datapost:${DB_PASSWORD:-datapost}@db:5432/datapost
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+      FASTAPI_URL: http://backend:8000
+    ports:
+      - "3000:3000"
+
+volumes:
+  db_data:
